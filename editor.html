@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flashcard editor</title>
+<style>
+:root {
+  --ink: #18181b;
+  --muted: #71717a;
+  --rule: #e4e4e7;
+  --bg: #fafafa;
+  --panel: #fff;
+  --accent: #b45309;
+  --accent-soft: #fef3c7;
+  --danger: #b91c1c;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------- shell */
+
+.app { display: flex; flex-direction: column; height: 100%; }
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--rule);
+}
+
+h1 { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; margin: 0; }
+
+.file {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.spacer { flex: 1; }
+
+#status { font-size: 12px; color: var(--muted); }
+#status.error { color: var(--danger); }
+
+/* A dot beside the title while there are edits the CSV hasn't seen. */
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); visibility: hidden; }
+body.dirty .dot { visibility: visible; }
+
+button {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { background: #f4f4f5; }
+
+button.primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+button.primary:hover:not(:disabled) { background: #000; }
+
+button:disabled { opacity: 0.4; cursor: default; }
+
+kbd {
+  font: inherit;
+  font-size: 10px;
+  color: var(--muted);
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-left: 5px;
+}
+
+main { flex: 1; display: flex; min-height: 0; }
+
+/* ---------------------------------------------------------------- list */
+
+#list {
+  width: 240px;
+  flex: none;
+  border-right: 1px solid var(--rule);
+  background: var(--panel);
+  overflow-y: auto;
+  padding: 8px;
+}
+
+#list:focus { outline: none; }
+#list:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.item {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.item:hover { background: #f4f4f5; }
+.item.selected { background: var(--accent-soft); border-color: #fcd34d; }
+
+.item .n {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+  min-width: 14px;
+}
+
+.item .t { font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item .t.blank { color: var(--muted); font-weight: 400; font-style: italic; }
+
+#add { width: 100%; margin-top: 6px; }
+
+/* ---------------------------------------------------------------- form */
+
+#form-panel { flex: 1; overflow-y: auto; padding: 18px 24px; min-width: 0; }
+
+.form { max-width: 600px; }
+
+.toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.toolbar .count { font-size: 12px; color: var(--muted); margin-right: 4px; }
+.toolbar .danger { margin-left: auto; color: var(--danger); }
+
+label {
+  display: block;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 5px;
+}
+
+.field { margin-bottom: 16px; }
+
+.hint { font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 11px; }
+
+input[type="text"], textarea {
+  font: inherit;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  resize: vertical;
+}
+
+input[type="text"]:focus, textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: var(--accent);
+}
+
+#f-term { font-size: 17px; font-weight: 600; }
+#f-page { width: 110px; }
+
+#empty { color: var(--muted); max-width: 380px; padding-top: 36px; }
+
+/* ---------------------------------------------------------------- preview */
+
+#preview-panel {
+  width: 400px;
+  flex: none;
+  border-left: 1px solid var(--rule);
+  background: var(--bg);
+  overflow-y: auto;
+  padding: 18px;
+}
+
+#preview-panel h2 {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+
+#preview {
+  width: 100%;
+  border: 0;
+  display: block;
+  overflow: hidden;
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>Flashcards</h1>
+    <span class="dot" title="unsaved changes"></span>
+    <span class="file" id="filename"></span>
+    <span class="spacer"></span>
+    <span id="status"></span>
+    <button id="save" class="primary">Save<kbd>⌘S</kbd></button>
+    <button id="generate">Generate &amp; print</button>
+  </header>
+
+  <main>
+    <nav id="list" tabindex="0"></nav>
+
+    <section id="form-panel">
+      <div class="form" id="form" hidden>
+        <div class="toolbar">
+          <span class="count" id="position"></span>
+          <button id="up" title="Move card up">↑</button>
+          <button id="down" title="Move card down">↓</button>
+          <button id="delete" class="danger">Delete</button>
+        </div>
+
+        <div class="field">
+          <label for="f-term">Term <span class="hint">— the front of the card</span></label>
+          <input type="text" id="f-term" data-field="term" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="f-definition">Definition <span class="hint">— in your own words</span></label>
+          <textarea id="f-definition" data-field="definition" rows="4"></textarea>
+        </div>
+        <div class="field">
+          <label for="f-page">Textbook page</label>
+          <input type="text" id="f-page" data-field="page" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-connection">Real-world connection</label>
+          <textarea id="f-connection" data-field="connection" rows="3"></textarea>
+        </div>
+      </div>
+
+      <div id="empty">
+        <p>No cards yet. Hit <strong>+ Add card</strong> to write your first one.</p>
+      </div>
+    </section>
+
+    <aside id="preview-panel">
+      <h2>Printed size</h2>
+      <iframe id="preview" title="Card preview" scrolling="no"></iframe>
+    </aside>
+  </main>
+</div>
+
+<script>
+'use strict';
+
+// ---------------------------------------------------------------- state
+//
+// Three variables hold everything: the cards, which one is open in the form,
+// and whether there are edits the CSV hasn't seen yet.
+
+let cards = [];
+let selected = -1;
+let dirty = false;
+let cardSize = { width: 3.85, height: 3.3667 };   // inches, replaced on load
+
+const PX_PER_IN = 96;
+
+const $ = (id) => document.getElementById(id);
+const listEl = $('list');
+const formEl = $('form');
+const emptyEl = $('empty');
+const statusEl = $('status');
+const previewEl = $('preview');
+const fields = [...document.querySelectorAll('[data-field]')];
+
+function setDirty(value) {
+  dirty = value;
+  document.body.classList.toggle('dirty', value);
+}
+
+function setStatus(text, isError) {
+  statusEl.textContent = text;
+  statusEl.classList.toggle('error', !!isError);
+}
+
+function esc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ---------------------------------------------------------------- rendering
+//
+// Only the list is rebuilt from state. The form is static HTML whose values are
+// filled in on selection: re-rendering it on every keystroke would destroy and
+// recreate the input being typed into, losing the cursor position.
+
+function renderList() {
+  listEl.replaceChildren();
+
+  cards.forEach((card, i) => {
+    const button = document.createElement('button');
+    button.className = 'item' + (i === selected ? ' selected' : '');
+    button.onclick = () => select(i);
+
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = i + 1;
+
+    const t = document.createElement('span');
+    t.className = 't' + (card.term ? '' : ' blank');
+    t.textContent = card.term || 'untitled';
+
+    button.append(n, t);
+    listEl.append(button);
+  });
+
+  const add = document.createElement('button');
+  add.id = 'add';
+  add.textContent = '+ Add card';
+  add.onclick = addCard;
+  listEl.append(add);
+
+  $('position').textContent = selected < 0 ? '' : 'Card ' + (selected + 1) + ' of ' + cards.length;
+  $('up').disabled = selected <= 0;
+  $('down').disabled = selected < 0 || selected >= cards.length - 1;
+}
+
+function select(index) {
+  selected = index;
+  const card = cards[index];
+
+  formEl.hidden = !card;
+  emptyEl.hidden = !!card;
+
+  if (card) {
+    for (const el of fields) el.value = card[el.dataset.field] || '';
+  }
+  renderList();
+  renderPreview();
+}
+
+// ---------------------------------------------------------------- preview
+//
+// The iframe pulls /preview.css, which is generate.js's own PRINT_CSS plus a
+// short override, and /preview.js, which is its own shrink-to-fit script. So
+// this really is the printed card, drawn at printed size and scaled to fit.
+
+let previewTimer = null;
+
+function renderPreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(renderPreviewNow, 150);
+}
+
+function renderPreviewNow() {
+  const card = cards[selected];
+  if (!card) { previewEl.srcdoc = ''; previewEl.style.height = '0px'; return; }
+
+  const n = selected + 1;
+  const page = card.page ? '<span class="page">p. ' + esc(card.page) + '</span>' : '<span></span>';
+  const connection = card.connection
+    ? '<div class="connection"><span class="label">Real-world connection</span>' + esc(card.connection) + '</div>'
+    : '';
+
+  // Same markup shape as renderCardFront / renderCardBack in generate.js.
+  const stack =
+    '<div class="tag">Front</div>' +
+    '<div class="card front">' +
+      '<div class="meta"><span>' + n + '</span><span></span></div>' +
+      '<div class="fit"><div class="term">' + esc(card.term) + '</div></div>' +
+    '</div>' +
+    '<div class="tag">Back</div>' +
+    '<div class="card back">' +
+      '<div class="meta"><span>' + n + '</span>' + page + '</div>' +
+      '<div class="fit"><div class="definition">' + esc(card.definition) + '</div>' + connection + '</div>' +
+    '</div>';
+
+  const available = previewEl.parentElement.clientWidth - 36;
+  const scale = Math.min(1, available / (cardSize.width * PX_PER_IN));
+
+  previewEl.srcdoc =
+    '<!doctype html><html><head><meta charset="utf-8">' +
+    '<link rel="stylesheet" href="/preview.css"></head><body>' +
+    '<div class="stack" style="transform:scale(' + scale + ')">' + stack + '</div>' +
+    '<script src="/preview.js"><\/script></body></html>';
+
+  // Height has to be set from the parent: the iframe won't size itself, and the
+  // scale transform doesn't change the content's own layout height.
+  previewEl.onload = () => {
+    const inner = previewEl.contentDocument && previewEl.contentDocument.querySelector('.stack');
+    previewEl.style.height = Math.ceil((inner ? inner.offsetHeight : 700) * scale) + 'px';
+  };
+}
+
+window.addEventListener('resize', renderPreview);
+
+// ---------------------------------------------------------------- editing
+
+// Typing writes straight into the selected card, then refreshes only that row's
+// label in the list.
+for (const el of fields) {
+  el.addEventListener('input', () => {
+    if (selected < 0) return;
+    cards[selected][el.dataset.field] = el.value;
+    setDirty(true);
+    setStatus('');
+    if (el.dataset.field === 'term') renderList();
+    renderPreview();
+  });
+}
+
+function addCard() {
+  cards.push({ term: '', definition: '', page: '', connection: '' });
+  select(cards.length - 1);
+  setDirty(true);
+  $('f-term').focus();
+}
+
+// Order sets the card numbers and decides which cards share a sheet, so moving
+// a card is just a swap - the numbers come from array position when read back.
+function moveCard(delta) {
+  const to = selected + delta;
+  if (selected < 0 || to < 0 || to >= cards.length) return;
+  [cards[selected], cards[to]] = [cards[to], cards[selected]];
+  select(to);
+  setDirty(true);
+  setStatus('');
+}
+
+function deleteCard() {
+  if (selected < 0) return;
+  const [gone] = cards.splice(selected, 1);
+  setDirty(true);
+  select(Math.min(selected, cards.length - 1));
+  setStatus('Deleted "' + (gone.term || 'untitled') + '" - reload before saving to undo');
+}
+
+$('up').onclick = () => moveCard(-1);
+$('down').onclick = () => moveCard(1);
+$('delete').onclick = deleteCard;
+
+// ---------------------------------------------------------------- server
+
+async function load() {
+  const res = await fetch('/api/cards');
+  const data = await res.json();
+  if (!res.ok) return setStatus(data.error, true);
+
+  cards = data.cards.map((c) => ({
+    term: c.term, definition: c.definition, page: c.page, connection: c.connection,
+  }));
+  cardSize = data.card;
+  $('filename').textContent = data.file;
+  select(cards.length ? 0 : -1);
+  setDirty(false);
+}
+
+async function save() {
+  const blank = cards.findIndex((c) => !c.term.trim());
+  if (blank !== -1) {
+    select(blank);
+    $('f-term').focus();
+    setStatus('Card ' + (blank + 1) + ' needs a term before saving', true);
+    return false;
+  }
+
+  setStatus('Saving...');
+  try {
+    const res = await fetch('/api/cards', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cards),
+    });
+    const data = await res.json();
+    if (!res.ok) { setStatus(data.error, true); return false; }
+    setDirty(false);
+    setStatus('Saved ' + data.saved + ' cards');
+    return true;
+  } catch (err) {
+    setStatus('Could not reach the editor - is node edit.js still running?', true);
+    return false;
+  }
+}
+
+async function generate() {
+  if (dirty && !(await save())) return;
+
+  setStatus('Generating...');
+  try {
+    const res = await fetch('/api/generate', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) { setStatus(data.error, true); return; }
+    setStatus(data.cards + ' cards -> ' + data.sheets + ' sheet(s), ' + data.pages + ' sides');
+    if (!window.open('/out/print.html', '_blank')) {
+      setStatus('Generated - open localhost/out/print.html (popup was blocked)');
+    }
+  } catch (err) {
+    setStatus('Could not reach the editor - is node edit.js still running?', true);
+  }
+}
+
+$('save').onclick = save;
+$('generate').onclick = generate;
+
+// ---------------------------------------------------------------- keyboard
+
+document.addEventListener('keydown', (e) => {
+  const mod = e.metaKey || e.ctrlKey;
+
+  if (mod && e.key === 's') { e.preventDefault(); save(); return; }
+  if (mod && e.key === 'Enter') { e.preventDefault(); addCard(); return; }
+
+  // Arrows move between cards, but only when a text field isn't focused -
+  // otherwise they'd fight with moving the caret.
+  const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+  if (typing || cards.length === 0) return;
+
+  if (e.key === 'ArrowDown') { e.preventDefault(); select(Math.min(selected + 1, cards.length - 1)); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); select(Math.max(selected - 1, 0)); }
+});
+
+window.addEventListener('beforeunload', (e) => {
+  if (!dirty) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+load();
+</script>
+
+</body>
+</html>

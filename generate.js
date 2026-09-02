@@ -123,16 +123,16 @@ function readCards(file) {
   try {
     text = fs.readFileSync(file, 'utf8');
   } catch (err) {
-    die(`could not read ${file}: ${err.message}`);
+    throw new Error(`could not read ${file}: ${err.message}`);
   }
 
   const rows = parseCSV(text);
-  if (rows.length === 0) die(`${file} has no cards in it`);
+  if (rows.length === 0) throw new Error(`${file} has no cards in it`);
 
   // Skip a header row if the first line looks like column names.
   const first = rows[0].map((c) => c.trim().toLowerCase());
   if (first.some((c) => HEADER_WORDS.includes(c))) rows.shift();
-  if (rows.length === 0) die(`${file} has a header but no cards`);
+  if (rows.length === 0) throw new Error(`${file} has a header but no cards`);
 
   return rows.map((cells, i) => {
     const card = {
@@ -143,10 +143,29 @@ function readCards(file) {
       connection: (cells[3] || '').trim(),
     };
     if (!card.term) {
-      die(`row ${i + 1} of ${file} has no term (columns: term, definition, page, connection)`);
+      throw new Error(`row ${i + 1} of ${file} has no term (columns: term, definition, page, connection)`);
     }
     return card;
   });
+}
+
+/**
+ * Quote a field only when it needs it: a comma, a quote mark or a newline
+ * inside the text would otherwise break the column structure. A literal quote
+ * is escaped by doubling it, which is what parseCSV reads back.
+ */
+function csvField(value) {
+  const s = value == null ? '' : String(value);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+/** Serialize cards back to CSV text, header row included. */
+function cardsToCSV(cards) {
+  const lines = [HEADER_WORDS.join(',')];
+  for (const card of cards) {
+    lines.push([card.term, card.definition, card.page, card.connection].map(csvField).join(','));
+  }
+  return lines.join('\n') + '\n';
 }
 
 // ---------------------------------------------------------------- layout
@@ -209,6 +228,9 @@ document.querySelectorAll('.fit').forEach(function (el) {
 });
 `.trim();
 
+// Printable area of a US Letter portrait page inside the @page margins.
+const SHEET = { width: 7.7, height: 10.1 };
+
 const PRINT_CSS = (rows, cols) => `
 @page { size: letter portrait; margin: 0.4in; }
 
@@ -233,8 +255,8 @@ body {
 }
 
 .sheet {
-  width: 7.7in;
-  height: 10.1in;
+  width: ${SHEET.width}in;
+  height: ${SHEET.height}in;
   margin: 0 auto 0.4in;
   display: grid;
   grid-template-columns: repeat(${cols}, 1fr);
@@ -506,7 +528,13 @@ ${rows.join('\n')}
 
 function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const cards = readCards(opts.input);
+
+  let cards;
+  try {
+    cards = readCards(opts.input);
+  } catch (err) {
+    die(err.message);
+  }
 
   fs.mkdirSync(opts.outdir, { recursive: true });
 
@@ -524,4 +552,18 @@ function main() {
   );
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = {
+  parseCSV,
+  readCards,
+  cardsToCSV,
+  buildPrintHTML,
+  buildStudyHTML,
+  renderCardFront,
+  renderCardBack,
+  PRINT_CSS,
+  AUTOFIT,
+  SHEET,
+  DEFAULTS,
+};
