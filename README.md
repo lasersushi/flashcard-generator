@@ -32,14 +32,45 @@ real-world connection.
 The small number in the corner is the same on both sides — it's there so you can confirm
 the alignment worked before you cut, and re-pair anything you drop on the floor.
 
-## Usage
+## Editing cards
+
+```sh
+node edit.js
+```
+
+Opens an editor at <http://localhost:5173> — a form for the four fields, a live preview of
+the card at its real printed size, and a **Generate & print** button that writes the sheets
+and opens them. Saving rewrites `cards.csv`, so the quoting is handled for you: commas,
+quote marks and line breaks inside a definition all round-trip correctly.
+
+| Key | |
+| --- | --- |
+| `⌘S` | save to `cards.csv` |
+| `⌘↵` | new card |
+| `↑` `↓` | move between cards (when you're not typing in a field) |
+
+Use `↑` `↓` in the toolbar to reorder a card, since order sets the card numbers and decides
+which cards share a sheet. The server listens on localhost only.
+
+### Options
+
+```
+--input <file>          CSV to edit              (default: cards.csv)
+--outdir <dir>          where sheets are written (default: out)
+--rows/--cols/--flip/--title
+                        same meaning as generate.js
+--port <n>              port to listen on        (default: 5173)
+--no-open               don't open a browser
+```
+
+## Usage without the editor
+
+`cards.csv` is still the source of truth, so hand-editing it works exactly as before:
 
 ```sh
 node generate.js
 open out/print.html   # then Cmd-P
 ```
-
-Edit `cards.csv`, re-run, print.
 
 ### Options
 
